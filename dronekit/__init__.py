@@ -1287,12 +1287,12 @@ class Vehicle(HasObservers):
         @self.on_message(['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'])
         def listener(self, name, msg):
             if not self._wp_loaded:
+                if name == 'MISSION_ITEM_INT':
+                    msg.x = msg.x / 1.0e7
+                    msg.y = msg.y / 1.0e7
                 if msg.seq == 0:
                     if not (msg.x == 0 and msg.y == 0 and msg.z == 0):
-                        if name == 'MISSION_ITEM_INT':
-                            self._home_location = LocationGlobal(msg.x / 1.0e7, msg.y / 1.0e7, msg.z)
-                        else:
-                            self._home_location = LocationGlobal(msg.x, msg.y, msg.z)
+                        self._home_location = LocationGlobal(msg.x, msg.y, msg.z)
 
                 if msg.seq > self._wploader.count():
                     # Unexpected waypoint
@@ -1319,6 +1319,9 @@ class Vehicle(HasObservers):
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
+                if name == 'MISSION_REQUEST_INT':
+                    wp.x = int(wp.x * 1.0e7)
+                    wp.y = int(wp.y * 1.0e7)
                 handler.fix_targets(wp)
                 self._master.mav.send(wp)
                 self._wp_uploaded[msg.seq] = True
