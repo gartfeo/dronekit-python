@@ -31,16 +31,7 @@ A number of other useful classes and methods are listed below.
 
 ----
 """
-
-import sys
 import collections
-
-# Python3.10 removed MutableMapping from collections:
-if sys.version_info.major == 3 and sys.version_info.minor >= 10:
-    from collections.abc import MutableMapping
-else:
-    from collections import MutableMapping
-
 import copy
 import logging
 import math
@@ -49,7 +40,6 @@ import time
 
 import monotonic
 from past.builtins import basestring
-
 from pymavlink import mavutil, mavwp
 from pymavlink.dialects.v10 import ardupilotmega
 
@@ -242,7 +232,7 @@ class Wind(object):
         self.wind_direction = wind_direction
         self.wind_speed = wind_speed
         self.wind_speed_z = wind_speed_z
-    
+
     def __str__(self):
         return "Wind: wind direction: {}, wind speed: {}, wind speed z: {}".format(self.wind_direction, self.wind_speed, self.wind_speed_z)
 
@@ -1182,17 +1172,20 @@ class Vehicle(HasObservers):
         # All keys are strings.
         self._channels = Channels(self, 8)
 
-        @self.on_message(['RC_CHANNELS_RAW', 'RC_CHANNELS'])
+        @self.on_message(['RC_CHANNELS_RAW'])
         def listener(self, name, m):
             def set_rc(chnum, v):
                 '''Private utility for handling rc channel messages'''
-                # use port to allow ch nums greater than 8
-                port = 0 if name == "RC_CHANNELS" else m.port
-                self._channels._update_channel(str(port * 8 + chnum), v)
+                self._channels._update_channel(str(m.port * 8 + chnum), v)
 
-            for i in range(1, (18 if name == "RC_CHANNELS" else 8)+1):
-                set_rc(i, getattr(m, "chan{}_raw".format(i)))
-
+            set_rc(1, m.chan1_raw)
+            set_rc(2, m.chan2_raw)
+            set_rc(3, m.chan3_raw)
+            set_rc(4, m.chan4_raw)
+            set_rc(5, m.chan5_raw)
+            set_rc(6, m.chan6_raw)
+            set_rc(7, m.chan7_raw)
+            set_rc(8, m.chan8_raw)
             self.notify_attribute_listeners('channels', self.channels)
 
         self._voltage = None
@@ -1279,14 +1272,19 @@ class Vehicle(HasObservers):
             if not self._wp_loaded:
                 self._wploader.clear()
                 self._wploader.expected_count = msg.count
-                self._master.waypoint_request_send(0)
+                # self._master.waypoint_request_send(0)
+                self._master.mav.mission_request_int_send(
+                    target_system=self._master.target_system,
+                    target_component=self._master.target_component,
+                    seq=0  # Sequence number of the mission item to request
+                )
 
         @self.on_message(['HOME_POSITION'])
         def listener(self, name, msg):
             self._home_location = LocationGlobal(msg.latitude / 1.0e7, msg.longitude / 1.0e7, msg.altitude / 1000.0)
             self.notify_attribute_listeners('home_location', self.home_location, cache=True)
 
-        @self.on_message(['WAYPOINT', 'MISSION_ITEM'])
+        @self.on_message(['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'])
         def listener(self, name, msg):
             if not self._wp_loaded:
                 if msg.seq == 0:
@@ -1303,13 +1301,18 @@ class Vehicle(HasObservers):
                     self._wploader.add(msg)
 
                     if msg.seq + 1 < self._wploader.expected_count:
-                        self._master.waypoint_request_send(msg.seq + 1)
+                        # self._master.waypoint_request_send(msg.seq + 1)
+                        self._master.mav.mission_request_int_send(
+                            target_system=self._master.target_system,
+                            target_component=self._master.target_component,
+                            seq=msg.seq + 1  # Sequence number of the mission item to request
+                        )
                     else:
                         self._wp_loaded = True
                         self.notify_attribute_listeners('commands', self.commands)
 
         # Waypoint send to master
-        @self.on_message(['WAYPOINT_REQUEST', 'MISSION_REQUEST'])
+        @self.on_message(['WAYPOINT_REQUEST', 'MISSION_REQUEST', 'MISSION_REQUEST_INT'])
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
@@ -2233,10 +2236,10 @@ class Vehicle(HasObservers):
         else:
             raise ValueError('Expecting location to be LocationGlobal or LocationGlobalRelative.')
 
-        self._master.mav.mission_item_send(0, 0, 0, frame,
-                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2, 0, 0,
-                                           0, 0, 0, location.lat, location.lon,
-                                           alt)
+        self._master.mav.mission_item_int_send(0, 0, 0, frame,
+                                               mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2, 0, 0,
+                                               0, 0, 0, location.lat, location.lon,
+                                               alt)
 
         if airspeed is not None:
             self.airspeed = airspeed
@@ -2731,7 +2734,7 @@ class Gimbal(object):
         return "Gimbal: pitch={0}, roll={1}, yaw={2}".format(self.pitch, self.roll, self.yaw)
 
 
-class Parameters(MutableMapping, HasObservers):
+class Parameters(collections.abc.MutableMapping, HasObservers):
     """
     This object is used to get and set the values of named parameters for a vehicle. See the following links for information about
     the supported parameters for each platform: `Copter Parameters <http://copter.ardupilot.com/wiki/configuration/arducopter-parameters/>`_,
@@ -2917,7 +2920,7 @@ class Parameters(MutableMapping, HasObservers):
         return super(Parameters, self).on_attribute(attr_name, *args, **kwargs)
 
 
-class Command(mavutil.mavlink.MAVLink_mission_item_message):
+class Command(mavutil.mavlink.MAVLink_mission_item_int_message):
     """
     A waypoint object.
 
