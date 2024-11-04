@@ -1291,7 +1291,7 @@ class Vehicle(HasObservers):
             if not self._wp_loaded:
                 if msg.seq == 0:
                     if not (msg.x == 0 and msg.y == 0 and msg.z == 0):
-                        self._home_location = LocationGlobal(msg.x / 1.0e7, msg.y / 1.0e7, msg.z / 1.0e7)
+                        self._home_location = LocationGlobal(msg.x / 1.0e7, msg.y / 1.0e7, msg.z)
 
                 if msg.seq > self._wploader.count():
                     # Unexpected waypoint
