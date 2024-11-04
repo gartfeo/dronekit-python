@@ -3106,10 +3106,7 @@ class CommandSequence(object):
         """
         Get the currently active waypoint number.
         """
-        current_wp = copy.copy(self._vehicle._current_waypoint)
-        current_wp.x /= 1.0e7
-        current_wp.y /= 1.0e7
-        return current_wp
+        return self._vehicle._current_waypoint
 
     @next.setter
     def next(self, index):
