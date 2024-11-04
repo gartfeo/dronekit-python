@@ -1319,8 +1319,9 @@ class Vehicle(HasObservers):
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
-                wp.x = int(wp.x * 1.0e7)
-                wp.y = int(wp.y * 1.0e7)
+                if name != 'MISSION_REQUEST_INT':
+                    wp.x = int(wp.x * 1.0e7)
+                    wp.y = int(wp.y * 1.0e7)
                 handler.fix_targets(wp)
                 self._master.mav.send(wp)
                 self._wp_uploaded[msg.seq] = True
