@@ -3064,8 +3064,8 @@ class CommandSequence(object):
         '''
         self.wait_ready()
         cmd = copy.copy(cmd)
-        cmd.x *= 1e7
-        cmd.y *= 1e7
+        cmd.x = int(cmd.x * 1e7)
+        cmd.y = int(cmd.y * 1e7)
         self._vehicle._handler.fix_targets(cmd)
         self._vehicle._wploader.add(cmd, comment='Added by DroneKit')
         self._vehicle._wpts_dirty = True
@@ -3107,8 +3107,8 @@ class CommandSequence(object):
         Get the currently active waypoint number.
         """
         current_wp = copy.copy(self._vehicle._current_waypoint)
-        current_wp.x /= 1e7
-        current_wp.y /= 1e7
+        current_wp.x /= 1.0e7
+        current_wp.y /= 1.0e7
         return current_wp
 
     @next.setter
@@ -3131,24 +3131,24 @@ class CommandSequence(object):
             result = []
             for ii in range(*index.indices(len(self))):
                 converted_ii = copy.copy(self[ii])
-                converted_ii.x /= 1e7
-                converted_ii.y /= 1e7
+                converted_ii.x /= 1.0e7
+                converted_ii.y /= 1.0e7
                 result.append(converted_ii)
             return result
         elif isinstance(index, int):
             item = copy.copy(self._vehicle._wploader.wp(index + 1))
             if not item:
                 raise IndexError('Index %s out of range.' % index)
-            item.x /= 1e7
-            item.y /= 1e7
+            item.x /= 1.0e7
+            item.y /= 1.0e7
             return item
         else:
             raise TypeError('Invalid argument type.')
 
     def __setitem__(self, index, value):
         value = copy.copy(value)
-        value.x *= 1e7
-        value.y *= 1e7
+        value.x = int(value.x * 1e7)
+        value.y = int(value.y * 1e7)
         self._vehicle._wploader.set(value, index + 1)
         self._vehicle._wpts_dirty = True
 
