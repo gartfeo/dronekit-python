@@ -189,9 +189,9 @@ class LocationLocal(object):
 
         if self.north is not None and self.east is not None:
             if self.down is not None:
-                return math.sqrt(self.north**2 + self.east**2 + self.down**2)
+                return math.sqrt(self.north ** 2 + self.east ** 2 + self.down ** 2)
             else:
-                return math.sqrt(self.north**2 + self.east**2)
+                return math.sqrt(self.north ** 2 + self.east ** 2)
 
 
 class GPSInfo(object):
@@ -228,13 +228,15 @@ class Wind(object):
     :param wind_speed: Wind speed in m/s
     :param wind_speed_z: vertical wind speed in m/s
     """
+
     def __init__(self, wind_direction, wind_speed, wind_speed_z):
         self.wind_direction = wind_direction
         self.wind_speed = wind_speed
         self.wind_speed_z = wind_speed_z
 
     def __str__(self):
-        return "Wind: wind direction: {}, wind speed: {}, wind speed z: {}".format(self.wind_direction, self.wind_speed, self.wind_speed_z)
+        return "Wind: wind direction: {}, wind speed: {}, wind speed z: {}".format(self.wind_direction, self.wind_speed,
+                                                                                   self.wind_speed_z)
 
 
 class Battery(object):
@@ -312,6 +314,7 @@ class Version(object):
         This is a composite of the product release cycle stage (rc, beta etc) and the version in that cycle - e.g. 23.
 
     """
+
     def __init__(self, raw_version, autopilot_type, vehicle_type):
         self.autopilot_type = autopilot_type
         self.vehicle_type = vehicle_type
@@ -322,9 +325,9 @@ class Version(object):
             self.patch = None
             self.release = None
         else:
-            self.major   = raw_version >> 24 & 0xFF
-            self.minor   = raw_version >> 16 & 0xFF
-            self.patch   = raw_version >> 8  & 0xFF
+            self.major = raw_version >> 24 & 0xFF
+            self.minor = raw_version >> 16 & 0xFF
+            self.patch = raw_version >> 8 & 0xFF
             self.release = raw_version & 0xFF
 
     def is_stable(self):
@@ -448,20 +451,21 @@ class Capabilities:
 
         Autopilot supports onboard compass calibration (Boolean).
     """
+
     def __init__(self, capabilities):
-        self.mission_float                  = (((capabilities >> 0)  & 1) == 1)
-        self.param_float                    = (((capabilities >> 1)  & 1) == 1)
-        self.mission_int                    = (((capabilities >> 2)  & 1) == 1)
-        self.command_int                    = (((capabilities >> 3)  & 1) == 1)
-        self.param_union                    = (((capabilities >> 4)  & 1) == 1)
-        self.ftp                            = (((capabilities >> 5)  & 1) == 1)
-        self.set_attitude_target            = (((capabilities >> 6)  & 1) == 1)
-        self.set_attitude_target_local_ned  = (((capabilities >> 7)  & 1) == 1)
-        self.set_altitude_target_global_int = (((capabilities >> 8)  & 1) == 1)
-        self.terrain                        = (((capabilities >> 9)  & 1) == 1)
-        self.set_actuator_target            = (((capabilities >> 10) & 1) == 1)
-        self.flight_termination             = (((capabilities >> 11) & 1) == 1)
-        self.compass_calibration            = (((capabilities >> 12) & 1) == 1)
+        self.mission_float = (((capabilities >> 0) & 1) == 1)
+        self.param_float = (((capabilities >> 1) & 1) == 1)
+        self.mission_int = (((capabilities >> 2) & 1) == 1)
+        self.command_int = (((capabilities >> 3) & 1) == 1)
+        self.param_union = (((capabilities >> 4) & 1) == 1)
+        self.ftp = (((capabilities >> 5) & 1) == 1)
+        self.set_attitude_target = (((capabilities >> 6) & 1) == 1)
+        self.set_attitude_target_local_ned = (((capabilities >> 7) & 1) == 1)
+        self.set_altitude_target_global_int = (((capabilities >> 8) & 1) == 1)
+        self.terrain = (((capabilities >> 9) & 1) == 1)
+        self.set_actuator_target = (((capabilities >> 10) & 1) == 1)
+        self.flight_termination = (((capabilities >> 11) & 1) == 1)
+        self.compass_calibration = (((capabilities >> 12) & 1) == 1)
 
 
 class VehicleMode(object):
@@ -1074,18 +1078,16 @@ class Vehicle(HasObservers):
         self._vy = None
         self._vz = None
 
-
         self._wind_direction = None
         self._wind_speed = None
         self._wind_speed_z = None
 
         @self.on_message('WIND')
-        def listener(self,name, m):
+        def listener(self, name, m):
             """ WIND {direction : -180.0, speed : 0.0, speed_z : 0.0} """
             self._wind_direction = m.direction
             self._wind_speed = m.speed
             self._wind_speed_z = m.speed_z
-
 
         @self.on_message('STATUSTEXT')
         def statustext_listener(self, name, m):
@@ -1284,15 +1286,12 @@ class Vehicle(HasObservers):
             self._home_location = LocationGlobal(msg.latitude / 1.0e7, msg.longitude / 1.0e7, msg.altitude / 1000.0)
             self.notify_attribute_listeners('home_location', self.home_location, cache=True)
 
-        @self.on_message(['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'])
+        @self.on_message(['WAYPOINT', 'MISSION_ITEM_INT'])
         def listener(self, name, msg):
             if not self._wp_loaded:
-                if name == 'MISSION_ITEM_INT':
-                    msg.x = msg.x / 1.0e7
-                    msg.y = msg.y / 1.0e7
                 if msg.seq == 0:
                     if not (msg.x == 0 and msg.y == 0 and msg.z == 0):
-                        self._home_location = LocationGlobal(msg.x, msg.y, msg.z)
+                        self._home_location = LocationGlobal(msg.x / 1.0e7, msg.y / 1.0e7, msg.z / 1.0e7)
 
                 if msg.seq > self._wploader.count():
                     # Unexpected waypoint
@@ -1319,9 +1318,6 @@ class Vehicle(HasObservers):
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
-                if name != 'MISSION_REQUEST_INT':
-                    wp.x = int(wp.x * 1.0e7)
-                    wp.y = int(wp.y * 1.0e7)
                 handler.fix_targets(wp)
                 self._master.mav.send(wp)
                 self._wp_uploaded[msg.seq] = True
@@ -1830,7 +1826,8 @@ class Vehicle(HasObservers):
         # check that mode is not INITIALSING
         # check that we have a GPS fix
         # check that EKF pre-arm is complete
-        return self.mode != 'INITIALISING' and (self.gps_0.fix_type is not None and self.gps_0.fix_type > 1) and self._ekf_predposhorizabs
+        return self.mode != 'INITIALISING' and (
+                self.gps_0.fix_type is not None and self.gps_0.fix_type > 1) and self._ekf_predposhorizabs
 
     @property
     def system_status(self):
@@ -1882,7 +1879,7 @@ class Vehicle(HasObservers):
     def groundspeed(self, speed):
         speed_type = 1  # ground speed
         msg = self.message_factory.command_long_encode(
-            0, 0,    # target system, target component
+            0, 0,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,  # command
             0,  # confirmation
             speed_type,  # param 1
@@ -1908,7 +1905,7 @@ class Vehicle(HasObservers):
     def airspeed(self, speed):
         speed_type = 0  # air speed
         msg = self.message_factory.command_long_encode(
-            0, 0,    # target system, target component
+            0, 0,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,  # command
             0,  # confirmation
             speed_type,  # param 1
@@ -2363,7 +2360,9 @@ class Vehicle(HasObservers):
 
     def send_capabilities_request(self, vehicle, name, m):
         '''Request an AUTOPILOT_VERSION packet'''
-        capability_msg = vehicle.message_factory.command_long_encode(0, 0, mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES, 0, 1, 0, 0, 0, 0, 0, 0)
+        capability_msg = vehicle.message_factory.command_long_encode(0, 0,
+                                                                     mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+                                                                     0, 1, 0, 0, 0, 0, 0, 0)
         vehicle.send_mavlink(capability_msg)
 
     def play_tune(self, tune):
@@ -2430,7 +2429,7 @@ class Vehicle(HasObservers):
                 else:
                     return False
             if (still_waiting_callback and
-                    now - still_waiting_last_message_sent > still_waiting_message_interval):
+                now - still_waiting_last_message_sent > still_waiting_message_interval):
                 still_waiting_last_message_sent = now
                 if still_waiting_callback:
                     still_waiting_callback(await_attributes - self._ready_attrs)
@@ -2463,7 +2462,8 @@ class Vehicle(HasObservers):
             0,  # param 2, 1: magnetometer calibration
             0,  # param 3, 1: ground pressure calibration
             0,  # param 4, 1: radio RC calibration, 2: RC trim calibration
-            0,  # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
+            0,
+            # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
             0,  # param 6, 2: airspeed calibration
             0,  # param 7, 1: ESC calibration, 3: barometer temperature calibration
         )
@@ -2495,7 +2495,8 @@ class Vehicle(HasObservers):
                 1,  # param 2, 1: magnetometer calibration
                 0,  # param 3, 1: ground pressure calibration
                 0,  # param 4, 1: radio RC calibration, 2: RC trim calibration
-                0,  # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
+                0,
+                # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
                 0,  # param 6, 2: airspeed calibration
                 0,  # param 7, 1: ESC calibration, 3: barometer temperature calibration
             )
@@ -2516,7 +2517,8 @@ class Vehicle(HasObservers):
             0,  # param 2, 1: magnetometer calibration
             0,  # param 3, 1: ground pressure calibration
             0,  # param 4, 1: radio RC calibration, 2: RC trim calibration
-            4 if simple else 1,  # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
+            4 if simple else 1,
+            # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
             0,  # param 6, 2: airspeed calibration
             0,  # param 7, 1: ESC calibration, 3: barometer temperature calibration
         )
@@ -2533,7 +2535,8 @@ class Vehicle(HasObservers):
             0,  # param 2, 1: magnetometer calibration
             0,  # param 3, 1: ground pressure calibration
             0,  # param 4, 1: radio RC calibration, 2: RC trim calibration
-            2,  # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
+            2,
+            # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
             0,  # param 6, 2: airspeed calibration
             0,  # param 7, 1: ESC calibration, 3: barometer temperature calibration
         )
@@ -2550,7 +2553,8 @@ class Vehicle(HasObservers):
             0,  # param 2, 1: magnetometer calibration
             1,  # param 3, 1: ground pressure calibration
             0,  # param 4, 1: radio RC calibration, 2: RC trim calibration
-            0,  # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
+            0,
+            # param 5, 1: accelerometer calibration, 2: board level calibration, 3: accelerometer temperature calibration, 4: simple accelerometer calibration
             0,  # param 6, 2: airspeed calibration
             0,  # param 7, 1: ESC calibration, 3: barometer temperature calibration
         )
@@ -2654,15 +2658,15 @@ class Gimbal(object):
         :param yaw: Gimbal yaw in degrees relative to *global frame* (0 is North, 90 is West, 180 is South etc.)
         """
         msg = self._vehicle.message_factory.mount_configure_encode(
-            0, 1,    # target system, target component
-            mavutil.mavlink.MAV_MOUNT_MODE_MAVLINK_TARGETING,  #mount_mode
+            0, 1,  # target system, target component
+            mavutil.mavlink.MAV_MOUNT_MODE_MAVLINK_TARGETING,  # mount_mode
             1,  # stabilize roll
             1,  # stabilize pitch
             1,  # stabilize yaw
         )
         self._vehicle.send_mavlink(msg)
         msg = self._vehicle.message_factory.mount_control_encode(
-            0, 1,    # target system, target component
+            0, 1,  # target system, target component
             pitch * 100,  # pitch is in centidegrees
             roll * 100,  # roll
             yaw * 100,  # yaw is in centidegrees
@@ -2689,7 +2693,7 @@ class Gimbal(object):
         """
         # set gimbal to targeting mode
         msg = self._vehicle.message_factory.mount_configure_encode(
-            0, 1,    # target system, target component
+            0, 1,  # target system, target component
             mavutil.mavlink.MAV_MOUNT_MODE_GPS_POINT,  # mount_mode
             1,  # stabilize roll
             1,  # stabilize pitch
@@ -2710,7 +2714,7 @@ class Gimbal(object):
 
         # set the ROI
         msg = self._vehicle.message_factory.command_long_encode(
-            0, 1,    # target system, target component
+            0, 1,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_SET_ROI,  # command
             0,  # confirmation
             0, 0, 0, 0,  # params 1-4
@@ -2728,7 +2732,7 @@ class Gimbal(object):
         or :py:func:`target_location`. Control will automatically be released if you change vehicle mode.
         """
         msg = self._vehicle.message_factory.mount_configure_encode(
-            0, 1,    # target system, target component
+            0, 1,  # target system, target component
             mavutil.mavlink.MAV_MOUNT_MODE_RC_TARGETING,  # mount_mode
             1,  # stabilize roll
             1,  # stabilize pitch
@@ -3059,6 +3063,9 @@ class CommandSequence(object):
         :param Command cmd: The command to be added.
         '''
         self.wait_ready()
+        cmd = copy.copy(cmd)
+        cmd.x *= 1e7
+        cmd.y *= 1e7
         self._vehicle._handler.fix_targets(cmd)
         self._vehicle._wploader.add(cmd, comment='Added by DroneKit')
         self._vehicle._wpts_dirty = True
@@ -3099,7 +3106,10 @@ class CommandSequence(object):
         """
         Get the currently active waypoint number.
         """
-        return self._vehicle._current_waypoint
+        current_wp = copy.copy(self._vehicle._current_waypoint)
+        current_wp.x /= 1e7
+        current_wp.y /= 1e7
+        return current_wp
 
     @next.setter
     def next(self, index):
@@ -3118,16 +3128,27 @@ class CommandSequence(object):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return [self[ii] for ii in range(*index.indices(len(self)))]
+            result = []
+            for ii in range(*index.indices(len(self))):
+                converted_ii = copy.copy(self[ii])
+                converted_ii.x /= 1e7
+                converted_ii.y /= 1e7
+                result.append(converted_ii)
+            return result
         elif isinstance(index, int):
-            item = self._vehicle._wploader.wp(index + 1)
+            item = copy.copy(self._vehicle._wploader.wp(index + 1))
             if not item:
                 raise IndexError('Index %s out of range.' % index)
+            item.x /= 1e7
+            item.y /= 1e7
             return item
         else:
             raise TypeError('Invalid argument type.')
 
     def __setitem__(self, index, value):
+        value = copy.copy(value)
+        value.x *= 1e7
+        value.y *= 1e7
         self._vehicle._wploader.set(value, index + 1)
         self._vehicle._wpts_dirty = True
 
@@ -3210,7 +3231,8 @@ def connect(ip,
     if not vehicle_class:
         vehicle_class = Vehicle
 
-    handler = MAVConnection(ip, baud=baud, source_system=source_system, source_component=source_component, use_native=use_native)
+    handler = MAVConnection(ip, baud=baud, source_system=source_system, source_component=source_component,
+                            use_native=use_native)
     vehicle = vehicle_class(handler)
 
     if status_printer:
