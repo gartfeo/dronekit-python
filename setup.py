@@ -16,7 +16,7 @@ setuptools.setup(
     url='https://github.com/dronekit/dronekit-python',
     author='3D Robotics',
     install_requires=[
-        'pymavlink git+https://github.com/gartfeo/mavlink.git#egg=pymavlink&subdirectory=pymavlink',
+        'git+https://github.com/gartfeo/mavlink.git#egg=pymavlink&subdirectory=pymavlink',
         'monotonic>=1.3',
     ],
     author_email='tim@3drobotics.com, kevinh@geeksville.com',
