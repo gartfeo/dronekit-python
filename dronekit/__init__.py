@@ -1389,7 +1389,7 @@ class Vehicle(HasObservers):
 
         self._heartbeat_warning = 5
         self._heartbeat_error = 30
-        self._heartbeat_lastreceived = 0
+        self._heartbeat_lastreceived = monotonic.monotonic()
         self._heartbeat_timeout = False
 
         @xhandler.forward_loop
