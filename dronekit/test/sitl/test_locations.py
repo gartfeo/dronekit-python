@@ -1,7 +1,6 @@
 import time
 from dronekit import connect, VehicleMode
 from dronekit.test import with_sitl, wait_for
-from nose.tools import assert_equals, assert_not_equals
 
 
 @with_sitl
@@ -21,17 +20,16 @@ def test_timeout(connpath):
 
         # Don't let the user try to fly autopilot is booting
         wait_for(lambda: vehicle.is_armable, 60)
-        assert_equals(vehicle.is_armable, True)
+        assert vehicle.is_armable
 
         # Copter should arm in GUIDED mode
         vehicle.mode = VehicleMode("GUIDED")
         wait_for(lambda: vehicle.mode.name == 'GUIDED', 60)
-        assert_equals(vehicle.mode.name, 'GUIDED')
+        assert vehicle.mode.name == 'GUIDED'
 
-        # Arm copter.
         vehicle.armed = True
         wait_for(lambda: vehicle.armed, 60)
-        assert_equals(vehicle.armed, True)
+        assert vehicle.armed
 
         # Take off to target altitude
         vehicle.simple_takeoff(aTargetAltitude)
@@ -46,7 +44,7 @@ def test_timeout(connpath):
                 # print "Reached target altitude"
                 break
 
-            assert_equals(vehicle.mode.name, 'GUIDED')
+            assert vehicle.mode.name == 'GUIDED'
             time.sleep(1)
 
     arm_and_takeoff(10)
@@ -54,17 +52,17 @@ def test_timeout(connpath):
 
     # .north, .east, and .down are initialized to None.
     # Any other value suggests that a LOCAL_POSITION_NED was received and parsed.
-    assert_not_equals(vehicle.location.local_frame.north, None)
-    assert_not_equals(vehicle.location.local_frame.east, None)
-    assert_not_equals(vehicle.location.local_frame.down, None)
+    assert vehicle.location.local_frame.north is not None
+    assert vehicle.location.local_frame.east is not None
+    assert vehicle.location.local_frame.down is not None
 
     # global_frame
-    assert_not_equals(vehicle.location.global_frame.lat, None)
-    assert_not_equals(vehicle.location.global_frame.lon, None)
-    assert_not_equals(vehicle.location.global_frame.alt, None)
-    assert_equals(type(vehicle.location.global_frame.lat), float)
-    assert_equals(type(vehicle.location.global_frame.lon), float)
-    assert_equals(type(vehicle.location.global_frame.alt), float)
+    assert vehicle.location.global_frame.lat is not None
+    assert vehicle.location.global_frame.lon is not None
+    assert vehicle.location.global_frame.alt is not None
+    assert isinstance(vehicle.location.global_frame.lat, float)
+    assert isinstance(vehicle.location.global_frame.lon, float)
+    assert isinstance(vehicle.location.global_frame.alt, float)
 
     vehicle.close()
 
@@ -77,7 +75,7 @@ def test_location_notify(connpath):
 
     @vehicle.location.on_attribute('global_frame')
     def callback(*args):
-        assert_not_equals(args[2].alt, 0)
+        assert args[2].alt != 0
         ret['success'] = True
 
     wait_for(lambda: ret['success'], 30)

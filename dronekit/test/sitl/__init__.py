@@ -1,6 +1,5 @@
 import time
 from contextlib import contextmanager
-from nose.tools import assert_equal
 from pymavlink import mavutil
 
 
@@ -42,6 +41,6 @@ def assert_command_ack(
         time.sleep(0.1)
     vehicle.remove_message_listener('COMMAND_ACK', on_ack)
 
-    assert_equal(1, len(acks))  # one and only one ACK
-    assert_equal(command_type, acks[0].command)  # for the correct command
-    assert_equal(ack_result, acks[0].result)  # the result must be successful
+    assert len(acks) == 1  # one and only one ACK
+    assert command_type == acks[0].command # for the correct command
+    assert ack_result == acks[0].result  # the result must be successful

@@ -1,7 +1,6 @@
 from __future__ import print_function
 import os
 from dronekit_sitl import SITL
-from nose.tools import with_setup
 import time
 
 sitl = None
@@ -25,10 +24,13 @@ def teardown_sitl():
 
 
 def with_sitl(fn):
-    @with_setup(setup_sitl, teardown_sitl)
-    def test(*args, **kargs):
-        return fn('tcp:127.0.0.1:5760', *args, **kargs)
-    return test
+    def wrapper(*args, **kwargs):
+        setup_sitl()
+        try:
+            return fn('tcp:127.0.0.1:5760', *args, **kwargs)
+        finally:
+            teardown_sitl()
+    return wrapper
 
 
 def wait_for(condition, time_max):
