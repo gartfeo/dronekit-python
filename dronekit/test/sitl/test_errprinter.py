@@ -1,8 +1,6 @@
 import logging
 import time
 
-from nose.tools import assert_true
-
 from dronekit import connect
 from dronekit.test import with_sitl
 
@@ -26,7 +24,7 @@ def test_115(connpath):
         time.sleep(1)
         i -= 1
 
-    assert_true(logging_check['ok'])
+    assert logging_check['ok']
     vehicle.close()
 
     # Cleanup the logger

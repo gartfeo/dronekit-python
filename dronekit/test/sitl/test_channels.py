@@ -1,7 +1,6 @@
 import time
 from dronekit import connect
 from dronekit.test import with_sitl
-from nose.tools import assert_equals
 
 
 def assert_readback(vehicle, values):
@@ -21,28 +20,15 @@ def assert_readback(vehicle, values):
 def test_timeout(connpath):
     vehicle = connect(connpath, wait_ready=True)
 
-    assert_equals(len(vehicle.channels), 8)
-    assert_equals(len(vehicle.channels.overrides), 8)
+    assert len(vehicle.channels) == 8
+    assert len(vehicle.channels.overrides) == 8
 
-    assert_equals(sorted(vehicle.channels.keys()), [str(x) for x in range(1, 9)])
-    assert_equals(sorted(vehicle.channels.overrides.keys()), [])
+    assert sorted(vehicle.channels.keys()) == [str(x) for x in range(1, 9)]
+    assert sorted(vehicle.channels.overrides.keys()) == []
 
-    assert_equals(type(vehicle.channels['1']), int)
-    assert_equals(type(vehicle.channels['2']), int)
-    assert_equals(type(vehicle.channels['3']), int)
-    assert_equals(type(vehicle.channels['4']), int)
-    assert_equals(type(vehicle.channels['5']), int)
-    assert_equals(type(vehicle.channels['6']), int)
-    assert_equals(type(vehicle.channels['7']), int)
-    assert_equals(type(vehicle.channels['8']), int)
-    assert_equals(type(vehicle.channels[1]), int)
-    assert_equals(type(vehicle.channels[2]), int)
-    assert_equals(type(vehicle.channels[3]), int)
-    assert_equals(type(vehicle.channels[4]), int)
-    assert_equals(type(vehicle.channels[5]), int)
-    assert_equals(type(vehicle.channels[6]), int)
-    assert_equals(type(vehicle.channels[7]), int)
-    assert_equals(type(vehicle.channels[8]), int)
+    for i in range(1, 9):
+        assert isinstance(vehicle.channels[str(i)], int)
+        assert isinstance(vehicle.channels[i], int)
 
     vehicle.channels.overrides = {'1': 1010}
     assert_readback(vehicle, {'1': 1010})
@@ -129,12 +115,12 @@ def test_timeout(connpath):
 
     # Clear all channels
     vehicle.channels.overrides = {}
-    assert_equals(len(vehicle.channels.overrides.keys()), 0)
+    assert not vehicle.channels.overrides.keys()
 
     # Set Ch2 to 33, clear channel 6
     vehicle.channels.overrides = {'2': 33, '6': None}
     assert_readback(vehicle, {'2': 33, '6': 1500})
-    assert_equals(list(vehicle.channels.overrides.keys()), ['2'])
+    assert list(vehicle.channels.overrides.keys()) == ['2']
 
     # Callbacks
     result = {'success': False}

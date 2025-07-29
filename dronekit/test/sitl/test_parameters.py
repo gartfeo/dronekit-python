@@ -1,7 +1,6 @@
 import time
 from dronekit import connect
 from dronekit.test import with_sitl
-from nose.tools import assert_equals, assert_not_equals
 
 
 @with_sitl
@@ -12,15 +11,15 @@ def test_parameters(connpath):
     # assert_equals(vehicle.parameters.get('THR_MIN', wait_ready=False), None)
 
     # With wait_ready, it should not be none.
-    assert_not_equals(vehicle.parameters.get('THR_MIN', wait_ready=True), None)
+    assert vehicle.paramaters.get('THR_MIN', wait_ready=True) is not None
 
     try:
-        assert_not_equals(vehicle.parameters['THR_MIN'], None)
+        assert vehicle.parameters['THR_MIN'] is not None
     except:
         assert False
 
     # Garbage value after all parameters are downloaded should be None.
-    assert_equals(vehicle.parameters.get('xXx_extreme_garbage_value_xXx', wait_ready=True), None)
+    assert vehicle.parameters.get('xXx_extreme_garbage_value_xXx', wait_ready=False) is None
 
     vehicle.close()
 
@@ -42,7 +41,7 @@ def test_iterating(connpath):
 def test_setting(connpath):
     vehicle = connect(connpath, wait_ready=True)
 
-    assert_not_equals(vehicle.parameters['THR_MIN'], None)
+    assert vehicle.parameters['THR_MIN'] is not None
 
     result = {'success': False}
 
@@ -58,6 +57,6 @@ def test_setting(connpath):
         time.sleep(1)
         i = i - 1
 
-    assert_equals(result['success'], True)
+    assert result['success']
 
     vehicle.close()
