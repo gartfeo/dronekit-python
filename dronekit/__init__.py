@@ -765,7 +765,7 @@ class ChannelsOverride(dict):
             overrides = [0] * 8
             for k, v in self.items():
                 overrides[int(k) - 1] = v
-            self._vehicle._master.mav.rc_channels_override_send(0, 0, *overrides)
+            self._vehicle._master.send_rc_overrides(overrides)
 
 
 class Channels(dict):
@@ -987,6 +987,7 @@ class Locations(HasObservers):
         """
         return LocationGlobalRelative(self._lat, self._lon, self._relative_alt)
 
+from dronekit.mavlink import MAVSystem
 
 class Vehicle(HasObservers):
     """
@@ -1035,7 +1036,7 @@ class Vehicle(HasObservers):
         to the project!
     """
 
-    def __init__(self, handler):
+    def __init__(self, xhandler, target_system=None, target_component=1):
         super(Vehicle, self).__init__()
 
         self._logger = logging.getLogger(__name__)  # Logger for DroneKit
@@ -1052,8 +1053,9 @@ class Vehicle(HasObservers):
             7: logging.DEBUG
         }
 
-        self._handler = handler
-        self._master = handler.master
+        self._handler = MAVSystem(xhandler, target_system=target_system, target_component=target_component)
+        self._master = self._handler
+        self._close_mav_on_disconnect = True
 
         # Cache all updated attributes for wait_ready.
         # By default, we presume all "commands" are loaded.
@@ -1069,7 +1071,7 @@ class Vehicle(HasObservers):
         # Attaches message listeners.
         self._message_listeners = dict()
 
-        @handler.forward_message
+        @self.handler.forward_message
         def listener(_, msg):
             self.notify_message_listeners(msg.get_type(), msg)
 
@@ -1318,8 +1320,7 @@ class Vehicle(HasObservers):
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
-                handler.fix_targets(wp)
-                self._master.mav.send(wp)
+                self._master.send_wp(wp)
                 self._wp_uploaded[msg.seq] = True
 
         # TODO: Waypoint loop listeners
@@ -1338,7 +1339,7 @@ class Vehicle(HasObservers):
         self._params_duration = start_duration
         self._parameters = Parameters(self)
 
-        @handler.forward_loop
+        @self.handler.forward_loop
         def listener(_):
             # Check the time duration for last "new" params exceeds watchdog.
             if not self._params_start:
@@ -1386,49 +1387,33 @@ class Vehicle(HasObservers):
                 import traceback
                 traceback.print_exc()
 
-        # Heartbeats.
-
-        self._heartbeat_started = False
-        self._heartbeat_lastsent = 0
+        self._heartbeat_warning = 5
+        self._heartbeat_error = 30
         self._heartbeat_lastreceived = 0
         self._heartbeat_timeout = False
 
-        self._heartbeat_warning = 5
-        self._heartbeat_error = 30
-        self._heartbeat_system = None
-
-        @handler.forward_loop
+        @xhandler.forward_loop
         def listener(_):
-            # Send 1 heartbeat per second
-            if monotonic.monotonic() - self._heartbeat_lastsent > 1:
-                self._master.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS,
-                                                mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
-                self._heartbeat_lastsent = monotonic.monotonic()
-
-            # Timeouts.
-            if self._heartbeat_started:
-                if self._heartbeat_error and monotonic.monotonic() - self._heartbeat_lastreceived > self._heartbeat_error > 0:
-                    raise APIException('No heartbeat in %s seconds, aborting.' %
-                                       self._heartbeat_error)
-                elif monotonic.monotonic() - self._heartbeat_lastreceived > self._heartbeat_warning:
-                    if self._heartbeat_timeout is False:
-                        self._logger.warning('Link timeout, no heartbeat in last %s seconds' % self._heartbeat_warning)
-                        self._heartbeat_timeout = True
+            delta = monotonic.monotonic() - self._heartbeat_lastreceived
+            if self._heartbeat_error and self._heartbeat_error > 0 and delta > self._heartbeat_error:
+                raise APIException('No heartbeat in %s seconds, aborting.' %
+                                   self._heartbeat_error)
+            elif delta > self._heartbeat_warning:
+                if self._heartbeat_timeout == False:
+                    self._logger.critical('>>> Link timeout, no heartbeat in last %s seconds' %
+                                          self._heartbeat_warning)
+                    self._heartbeat_timeout = True
 
         @self.on_message(['HEARTBEAT'])
         def listener(self, name, msg):
-            # ignore groundstations
-            if msg.type == mavutil.mavlink.MAV_TYPE_GCS or (not self._handler.master.probably_vehicle_heartbeat(msg)):
-                return
-            self._heartbeat_system = msg.get_srcSystem()
             self._heartbeat_lastreceived = monotonic.monotonic()
             if self._heartbeat_timeout:
                 self._logger.info('...link restored.')
-            self._heartbeat_timeout = False
+                self._heartbeat_timeout = False
 
         self._last_heartbeat = None
 
-        @handler.forward_loop
+        @xhandler.forward_loop
         def listener(_):
             if self._heartbeat_lastreceived:
                 self._last_heartbeat = monotonic.monotonic() - self._heartbeat_lastreceived
@@ -2224,14 +2209,8 @@ class Vehicle(HasObservers):
         :param groundspeed: Target groundspeed in m/s (optional).
         '''
         if isinstance(location, LocationGlobalRelative):
-            frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
             alt = location.alt
         elif isinstance(location, LocationGlobal):
-            # This should be the proper code:
-            # frame = mavutil.mavlink.MAV_FRAME_GLOBAL
-            # However, APM discards information about the relative frame
-            # and treats any alt value as relative. So we compensate here.
-            frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
             if not self.home_location:
                 self.commands.download()
                 self.commands.wait_ready()
@@ -2239,10 +2218,7 @@ class Vehicle(HasObservers):
         else:
             raise ValueError('Expecting location to be LocationGlobal or LocationGlobalRelative.')
 
-        self._master.mav.mission_item_int_send(0, 0, 0, frame,
-                                               mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2, 0, 0,
-                                               0, 0, 0, int(location.lat * 1e7), int(location.lon * 1e7),
-                                               alt)
+        self._handler.simple_goto(location.lat, location.lon, alt, relative=True)
 
         if airspeed is not None:
             self.airspeed = airspeed
@@ -2318,15 +2294,13 @@ class Vehicle(HasObservers):
 
         # Poll for first heartbeat.
         # If heartbeat times out, this will interrupt.
-        while self._handler._alive:
+        while self._handler.alive():
             time.sleep(.1)
             if self._heartbeat_lastreceived != start:
                 break
-        if not self._handler._alive:
-            raise APIException('Timeout in initializing connection.')
 
-        # Register target_system now.
-        self._handler.target_system = self._heartbeat_system
+        if not self._handler.alive():
+            raise APIException('Timeout in initializing connection.')
 
         # Wait until board has booted.
         while True:
@@ -2336,8 +2310,7 @@ class Vehicle(HasObservers):
 
         # Initialize data stream.
         if rate is not None:
-            self._master.mav.request_data_stream_send(0, 0, mavutil.mavlink.MAV_DATA_STREAM_ALL,
-                                                      rate, 1)
+            self._master.request_data_stream(rate)
 
         self.add_message_listener('HEARTBEAT', self.send_capabilities_request)
 
@@ -2435,6 +2408,19 @@ class Vehicle(HasObservers):
                     still_waiting_callback(await_attributes - self._ready_attrs)
 
         return True
+
+    def waypoint_count_send(self, count):
+        self._master.waypoint_count_send(count)
+
+    def set_close_mav_on_disconnect(self, value):
+        self._close_mav_on_disconnect = value
+
+    def close_mav_on_disconnect(self):
+        return self._close_mav_on_disconnect
+
+    def disconnect(self):
+        if self.close_mav_on_disconnect():
+            self._handler.conn.close()
 
     def reboot(self):
         """Requests an autopilot reboot by sending a ``MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN`` command."""
@@ -3084,7 +3070,7 @@ class CommandSequence(object):
             start_time = time.time()
             if self._vehicle._wploader.count() > 0:
                 self._vehicle._wp_uploaded = [False] * self._vehicle._wploader.count()
-                self._vehicle._master.waypoint_count_send(self._vehicle._wploader.count())
+                self._vehicle.waypoint_count_send(self._vehicle._wploader.count())
                 while False in self._vehicle._wp_uploaded:
                     if timeout and time.time() - start_time > timeout:
                         raise TimeoutError
@@ -3167,6 +3153,8 @@ def connect(ip,
             heartbeat_timeout=30,
             source_system=255,
             source_component=0,
+            target_system=1,
+            target_component=1,
             use_native=False):
     """
     Returns a :py:class:`Vehicle` object connected to the address specified by string parameter ``ip``.
@@ -3204,6 +3192,12 @@ def connect(ip,
         If a heartbeat is not detected within this time an exception will be raised.
     :param int source_system: The MAVLink ID of the :py:class:`Vehicle` object returned by this method (by default 255).
     :param int source_component: The MAVLink Component ID fo the :py:class:`Vehicle` object returned by this method (by default 0).
+    :param int heartbeat_timeout: Connection timeout value in seconds (default is 30s).
+        If a heartbeat is not detected within this time an exception will be raised.
+    :param int source_system: The MAVLink ID of the :py:class:`Vehicle` object returned by this method (by default 255).  When commands are sent to the vehicle, this is used as the source ID.
+    :param int target_system: The MAVLink ID of the vehicle this Vehicle object represents.  When commands are sent to the vehicle, this SHOULD be used as the target id.
+        Incoming messages from the connection are filtered according to this value, with "0" indicating no filtering and None indicating total filtering.
+        Broadcast messages (those with a source system of 0) are only filtered if target_id is None
     :param bool use_native: Use precompiled MAVLink parser.
 
         .. note::
@@ -3228,9 +3222,15 @@ def connect(ip,
     if not vehicle_class:
         vehicle_class = Vehicle
 
-    handler = MAVConnection(ip, baud=baud, source_system=source_system, source_component=source_component,
-                            use_native=use_native)
-    vehicle = vehicle_class(handler)
+    if isinstance(ip, mavlink.MAVConnection):
+        handler = ip
+    else:
+        handler = MAVConnection(ip, baud=baud, source_system=source_system, source_component=source_component,
+                                use_native=use_native)
+
+    vehicle = vehicle_class(handler, target_system=target_system, target_component=target_component)
+
+    vehicle.set_close_mav_on_disconnect(not isinstance(ip, mavlink.MAVConnection))
 
     if status_printer:
         vehicle._autopilot_logger.addHandler(ErrprinterHandler(status_printer))
