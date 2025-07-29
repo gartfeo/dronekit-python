@@ -1071,7 +1071,7 @@ class Vehicle(HasObservers):
         # Attaches message listeners.
         self._message_listeners = dict()
 
-        @self.handler.forward_message
+        @self._handler.forward_message
         def listener(_, msg):
             self.notify_message_listeners(msg.get_type(), msg)
 
@@ -1339,7 +1339,7 @@ class Vehicle(HasObservers):
         self._params_duration = start_duration
         self._parameters = Parameters(self)
 
-        @self.handler.forward_loop
+        @xhandler.forward_loop
         def listener(_):
             # Check the time duration for last "new" params exceeds watchdog.
             if not self._params_start:

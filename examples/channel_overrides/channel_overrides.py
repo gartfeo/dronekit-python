@@ -4,12 +4,12 @@
 """
 © Copyright 2015-2016, 3D Robotics.
 
-channel_overrides.py: 
+channel_overrides.py:
 
 Demonstrates how set and clear channel-override information.
 
-# NOTE: 
-Channel overrides (a.k.a "RC overrides") are highly discommended (they are primarily implemented 
+# NOTE:
+Channel overrides (a.k.a "RC overrides") are highly discommended (they are primarily implemented
 for simulating user input and when implementing certain types of joystick control).
 
 They are provided for development purposes. Please raise an issue explaining why you need them
@@ -19,12 +19,12 @@ Full documentation is provided at http://python.dronekit.io/examples/channel_ove
 """
 from __future__ import print_function
 from dronekit import connect
-
+import time
 
 #Set up option parsing to get connection string
-import argparse  
+import argparse
 parser = argparse.ArgumentParser(description='Example showing how to set and clear vehicle channel-override information.')
-parser.add_argument('--connect', 
+parser.add_argument('--connect',
                    help="vehicle connection target string. If not specified, SITL automatically started and used.")
 args = parser.parse_args()
 
@@ -73,25 +73,50 @@ print(" Channel overrides: %s" % vehicle.channels.overrides)
 
 print("Set Ch1-Ch8 overrides to 110-810 respectively")
 vehicle.channels.overrides = {'1': 110, '2': 210,'3': 310,'4':4100, '5':510,'6':610,'7':710,'8':810}
-print(" Channel overrides: %s" % vehicle.channels.overrides) 
+print(" Channel overrides: %s" % vehicle.channels.overrides)
 
 
 # Clear override by setting channels to None
 print("\nCancel Ch2 override (indexing syntax)")
 vehicle.channels.overrides['2'] = None
-print(" Channel overrides: %s" % vehicle.channels.overrides) 
+print(" Channel overrides: %s" % vehicle.channels.overrides)
 
 print("Clear Ch3 override (del syntax)")
 del vehicle.channels.overrides['3']
-print(" Channel overrides: %s" % vehicle.channels.overrides) 
+print(" Channel overrides: %s" % vehicle.channels.overrides)
 
 print("Clear Ch5, Ch6 override and set channel 3 to 500 (dictionary syntax)")
 vehicle.channels.overrides = {'5':None, '6':None,'3':500}
-print(" Channel overrides: %s" % vehicle.channels.overrides) 
+print(" Channel overrides: %s" % vehicle.channels.overrides)
 
 print("Clear all overrides")
 vehicle.channels.overrides = {}
-print(" Channel overrides: %s" % vehicle.channels.overrides) 
+print(" Channel overrides: %s" % vehicle.channels.overrides)
+
+print("Define a channel override callback and register it")
+result = {'value': -1}
+vehicle.channels.overrides = {}
+def channels_callback(vehicle, name, channels):
+    print("channels['3'] == %d\n" % channels['3'])
+    result['value'] = channels['3']
+
+vehicle.add_attribute_listener('channels', channels_callback)
+vehicle.channels.overrides = {'3': 55}
+
+print("Wait for channel callback to be called")
+i = 5
+while result['value'] != 55 and i>0:
+    time.sleep(.5)
+    i -= 1
+
+if result['value'] != -1:
+    print("Value changed")
+if result['value'] == 55:
+    print("Value correct")
+else:
+    print("Value incorrect (%d)" % (result['value'],))
+vehicle.remove_attribute_listener('channels', channels_callback)
+print("Unregistered")
 
 #Close vehicle object before exiting script
 print("\nClose vehicle object")
