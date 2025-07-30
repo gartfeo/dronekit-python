@@ -1265,7 +1265,7 @@ class Vehicle(HasObservers):
         # Waypoints.
 
         self._home_location = None
-        self._wploader = mavwp.MAVWPLoader()
+        self._wploader = mavwp.MAVWPLoader(target_system, target_component)
         self._wp_loaded = True
         self._wp_uploaded = None
         self._wpts_dirty = False
