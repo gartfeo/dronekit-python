@@ -5,15 +5,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dronekit"
-version = "2.9.24"
+version = "2.9.25"
 description = "Developer Tools for Drones."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.7"
 license = { text = "Apache-2.0" }
 
 authors = [
-  { name = "3D Robotics", email = "tim@3drobotics.com" },
-  { name = "Kevin H",   email = "kevinh@geeksville.com" }
+  { name = "3D Robotics", email = "tim@3drobotics.com" },
+  { name = "Kevin H",   email = "kevinh@geeksville.com" }
 ]
 
 dependencies = [

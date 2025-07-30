@@ -38,12 +38,8 @@ class MAVWriter(object):
 
 
 class MAVSystem(mavutil.mavsource):
-    def __init__(self, conn, target_system=None, target_component=1):
+    def __init__(self, conn, target_system=0, target_component=0):
         self._logger = logging.getLogger(__name__)
-
-        if target_system is None:
-            # replace this with some sort of search function
-            target_system = 1
 
         super(MAVSystem, self).__init__(conn.master, target_system, target_component)
 
@@ -87,8 +83,8 @@ class MAVSystem(mavutil.mavsource):
         return self.conn._alive
 
     def request_data_stream(self, rate):
-        self.mav.request_data_stream_send(self.target_system,
-                                          self.target_component,
+        self.mav.request_data_stream_send(self.system_id,
+                                          self.component_id,
                                           mavutil.mavlink.MAV_DATA_STREAM_ALL,
                                           rate, 1)
 
@@ -105,8 +101,8 @@ class MAVSystem(mavutil.mavsource):
         if relative != True:
             raise APIException('relative positions required')
 
-        self.mav.mission_item_send(self.target_system,
-                                   self.target_component,
+        self.mav.mission_item_send(self.system_id,
+                                   self.component_id,
                                    0,
                                    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                    mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2, 0, 0,
@@ -116,9 +112,9 @@ class MAVSystem(mavutil.mavsource):
     def fix_targets(self, message):
         """Set correct target IDs for our vehicle"""
         if hasattr(message, 'target_system'):
-            message.target_system = self.target_system
+            message.target_system = self.system_id
         if hasattr(message, 'target_component'):
-            message.target_component = self.target_component
+            message.target_component = self.component_id
 
     def pipe(self, out):
         '''Pipe *all* messages coming across vehicle connection into out.  This is deprecated in favour of calling pipe() on the connection itself'''
