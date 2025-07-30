@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dronekit"
-version = "2.9.3"
+version = "2.9.24"
 description = "Developer Tools for Drones."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.7"
