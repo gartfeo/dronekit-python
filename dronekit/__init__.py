@@ -1246,7 +1246,7 @@ class Vehicle(HasObservers):
         @self.on_message('HEARTBEAT')
         def listener(self, name, m):
             # ignore groundstations
-            if m.type == mavutil.mavlink.MAV_TYPE_GCS or (not self._handler.probably_vehicle_heartbeat(m)):
+            if m.type == mavutil.mavlink.MAV_TYPE_GCS or (not self._master.probably_vehicle_heartbeat(m)):
                 return
             self._armed = (m.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
             self.notify_attribute_listeners('armed', self.armed, cache=True)
@@ -1278,8 +1278,8 @@ class Vehicle(HasObservers):
                 self._wploader.expected_count = msg.count
                 # self._master.waypoint_request_send(0)
                 self._master.mav.mission_request_int_send(
-                    target_system=self._handler.system_id,
-                    target_component=self._handler.component_id,
+                    target_system=self._master.system_id,
+                    target_component=self._master.component_id,
                     seq=0  # Sequence number of the mission item to request
                 )
 
@@ -1307,8 +1307,8 @@ class Vehicle(HasObservers):
                     if msg.seq + 1 < self._wploader.expected_count:
                         # self._master.waypoint_request_send(msg.seq + 1)
                         self._master.mav.mission_request_int_send(
-                            target_system=self._handler.system_id,
-                            target_component=self._handler.component_id,
+                            target_system=self._master.system_id,
+                            target_component=self._master.component_id,
                             seq=msg.seq + 1  # Sequence number of the mission item to request
                         )
                     else:
@@ -1320,7 +1320,8 @@ class Vehicle(HasObservers):
         def listener(self, name, msg):
             if self._wp_uploaded is not None:
                 wp = self._wploader.wp(msg.seq)
-                self._master.send_wp(wp)
+                self._handler.fix_targets(wp)
+                self._master.mav.send(wp)
                 self._wp_uploaded[msg.seq] = True
 
         # TODO: Waypoint loop listeners
@@ -1354,8 +1355,8 @@ class Vehicle(HasObservers):
                 for i, v in enumerate(self._params_set):
                     if v is None:
                         self._master.mav.param_request_read_send(
-                            self._handler.system_id,
-                            self._handler.component_id,
+                            self._master.system_id,
+                            self._master.component_id,
                             b'',
                             i)
                         c += 1
@@ -1868,7 +1869,7 @@ class Vehicle(HasObservers):
     def groundspeed(self, speed):
         speed_type = 1  # ground speed
         msg = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id,  # target system, target component
+            self._master.system_id, self._master.component_id,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,  # command
             0,  # confirmation
             speed_type,  # param 1
@@ -1894,7 +1895,7 @@ class Vehicle(HasObservers):
     def airspeed(self, speed):
         speed_type = 0  # air speed
         msg = self.message_factory.command_long_encode(
-            0, 0,  # target system, target component
+            self._master.system_id, self._master.component_id,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,  # command
             0,  # confirmation
             speed_type,  # param 1
@@ -2019,7 +2020,7 @@ class Vehicle(HasObservers):
 
         # Send MAVLink update.
         self.send_mavlink(self.message_factory.command_long_encode(
-            0, 0,  # target system, target component
+            self._master.system_id, self._master.component_id,  # target system, target component
             mavutil.mavlink.MAV_CMD_DO_SET_HOME,  # command
             0,  # confirmation
             0,  # param 1: 1 to use current position, 0 to use the entered values.
@@ -2183,7 +2184,7 @@ class Vehicle(HasObservers):
             altitude = float(alt)
             if math.isnan(altitude) or math.isinf(altitude):
                 raise ValueError("Altitude was NaN or Infinity. Please provide a real number")
-            self._master.mav.command_long_send(self._handler.system_id, self._handler.component_id,
+            self._master.mav.command_long_send(self._master.system_id, self._master.component_id,
                                                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                                                0, 0, 0, 0, 0, 0, 0, altitude)
 
@@ -2223,7 +2224,7 @@ class Vehicle(HasObservers):
         else:
             raise ValueError('Expecting location to be LocationGlobal or LocationGlobalRelative.')
 
-        self._handler.simple_goto(location.lat, location.lon, alt, relative=True)
+        self._master.simple_goto(location.lat, location.lon, alt, relative=True)
 
         if airspeed is not None:
             self.airspeed = airspeed
@@ -2338,14 +2339,14 @@ class Vehicle(HasObservers):
 
     def send_capabilities_request(self, vehicle, name, m):
         '''Request an AUTOPILOT_VERSION packet'''
-        capability_msg = vehicle.message_factory.command_long_encode(0, 0,
+        capability_msg = vehicle.message_factory.command_long_encode(self._master.system_id, self._master.component_id,
                                                                      mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                                                                      0, 1, 0, 0, 0, 0, 0, 0)
         vehicle.send_mavlink(capability_msg)
 
     def play_tune(self, tune):
         '''Play a tune on the vehicle'''
-        msg = self.message_factory.play_tune_encode(0, 0, tune)
+        msg = self.message_factory.play_tune_encode(self._master.system_id, self._master.component_id, tune)
         self.send_mavlink(msg)
 
     def wait_ready(self, *types, **kwargs):
@@ -2425,13 +2426,13 @@ class Vehicle(HasObservers):
 
     def disconnect(self):
         if self.close_mav_on_disconnect():
-            self._handler.conn.close()
+            self._master.conn.close()
 
     def reboot(self):
         """Requests an autopilot reboot by sending a ``MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN`` command."""
 
         reboot_msg = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id, # target_system, target_component
+            self._master.system_id, self._master.component_id, # target_system, target_component
             mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,  # command
             0,  # confirmation
             1,  # param 1, autopilot (reboot)
@@ -2446,7 +2447,7 @@ class Vehicle(HasObservers):
         """Request gyroscope calibration."""
 
         calibration_command = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id, # target_system, target_component
+            self._master.system_id, self._master.component_id, # target_system, target_component
             mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,  # command
             0,  # confirmation
             1,  # param 1, 1: gyro calibration, 3: gyro temperature calibration
@@ -2466,7 +2467,7 @@ class Vehicle(HasObservers):
         # ArduPilot requires the MAV_CMD_DO_START_MAG_CAL command, only present in the ardupilotmega.xml definition
         if self._autopilot_type == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA:
             calibration_command = self.message_factory.command_long_encode(
-                self._handler.system_id, self._handler.component_id, # target_system, target_component
+                self._master.system_id, self._master.component_id, # target_system, target_component
                 mavutil.mavlink.MAV_CMD_DO_START_MAG_CAL,  # command
                 0,  # confirmation
                 0,  # param 1, uint8_t bitmask of magnetometers (0 means all).
@@ -2479,7 +2480,7 @@ class Vehicle(HasObservers):
             )
         else:
             calibration_command = self.message_factory.command_long_encode(
-                self._handler.system_id, self._handler.component_id, # target_system, target_component
+                self._master.system_id, self._master.component_id, # target_system, target_component
                 mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,  # command
                 0,  # confirmation
                 0,  # param 1, 1: gyro calibration, 3: gyro temperature calibration
@@ -2501,7 +2502,7 @@ class Vehicle(HasObservers):
         """
 
         calibration_command = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id, # target_system, target_component
+            self._master.system_id, self._master.component_id, # target_system, target_component
             mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,  # command
             0,  # confirmation
             0,  # param 1, 1: gyro calibration, 3: gyro temperature calibration
@@ -2519,7 +2520,7 @@ class Vehicle(HasObservers):
         """Request vehicle level (accelerometer trim) calibration."""
 
         calibration_command = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id, # target_system, target_component
+            self._master.system_id, self._master.component_id, # target_system, target_component
             mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,  # command
             0,  # confirmation
             0,  # param 1, 1: gyro calibration, 3: gyro temperature calibration
@@ -2537,7 +2538,7 @@ class Vehicle(HasObservers):
         """Request barometer calibration."""
 
         calibration_command = self.message_factory.command_long_encode(
-            self._handler.system_id, self._handler.component_id, # target_system, target_component
+            self._master.system_id, self._master.component_id, # target_system, target_component
             mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,  # command
             0,  # confirmation
             0,  # param 1, 1: gyro calibration, 3: gyro temperature calibration
