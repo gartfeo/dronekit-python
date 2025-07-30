@@ -51,7 +51,8 @@ class MAVSystem(mavutil.mavsource):
         # the upstream connection object:
         @conn.forward_message
         def listener(_, msg):
-            if msg.get_srcSystem() == self.system_id:
+            src_system = msg.get_srcSystem()
+            if src_system == self.system_id or src_system == 0 or src_system == 255:
                 self.notify_message_listeners(msg)
 
     def remove_message_listener(self, name, fn):
