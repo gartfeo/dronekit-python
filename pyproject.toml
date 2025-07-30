@@ -19,7 +19,7 @@ authors = [
 dependencies = [
   "monotonic>=1.3",
   "future",
-  "pymavlink @ git+https://github.com/gartfeo/mavlink.git#egg=pymavlink&subdirectory=pymavlink"
+  "pymavlink @ git+https://github.com/gartfeo/mavlink.git@mavsource#egg=pymavlink&subdirectory=pymavlink"
 ]
 
 [project.urls]
